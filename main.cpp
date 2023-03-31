@@ -27,14 +27,14 @@ int main(int argc, char* argv[])
 
         V = (Eigen::MatrixXd(3, 3) <<
             0.f, 0.f, z,
-            1.f, 0.f, z,
+            y, x, z,
             x, y, z
             ).finished();
 
         F = (Eigen::MatrixXi(1, 3) <<
             0, 1, 2
             ).finished();
-
+        viewer.data().set_vertices(V);
         return false;
     };
 
