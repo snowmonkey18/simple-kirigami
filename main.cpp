@@ -13,14 +13,14 @@ int main(int argc, char* argv[])
         ).finished();
     igl::opengl::glfw::Viewer viewer;
 
-    viewer.callback_mouse_down =
+    viewer.callback_mouse_move =
         [&V, &F](igl::opengl::glfw::Viewer& viewer, int, int)->bool
     {
         int fid;
         Eigen::Vector3f bc;
         // Cast a ray in the view direction starting from the mouse position
-        double x = viewer.current_mouse_x;
-        double y = viewer.core().viewport(3) - viewer.current_mouse_y;
+        double x = (viewer.current_mouse_x - viewer.core().viewport[0]) / viewer.core().viewport[2];
+        double y = 1 - (viewer.current_mouse_y + viewer.core().viewport[1]) / viewer.core().viewport[3];
         double z = 0.f;
 
         std::cout << "hello: " << x << ' ' << y << ' ' << z << std::endl;
@@ -31,9 +31,6 @@ int main(int argc, char* argv[])
             x, y, z
             ).finished();
 
-        F = (Eigen::MatrixXi(1, 3) <<
-            0, 1, 2
-            ).finished();
         viewer.data().set_vertices(V);
         return false;
     };
