@@ -13,6 +13,25 @@
 #include <iostream>
 #include <stack>
 
+#include <igl/colon.h>
+#include <igl/directed_edge_orientations.h>
+#include <igl/directed_edge_parents.h>
+#include <igl/forward_kinematics.h>
+#include <igl/PI.h>
+#include <igl/lbs_matrix.h>
+#include <igl/deform_skeleton.h>
+#include <igl/dqs.h>
+#include <igl/readDMAT.h>
+#include <igl/readOFF.h>
+#include <igl/arap.h>
+#include <igl/opengl/glfw/Viewer.h>
+
+#include <Eigen/Geometry>
+#include <Eigen/StdVector>
+#include <vector>
+#include <algorithm>
+#include <iostream>
+
 // Undoable
 struct State
 {
@@ -25,13 +44,13 @@ int main(int argc, char* argv[])
 {
     // Undo Management
     std::stack<State> undo_stack, redo_stack;
-    const auto push_undo = [&](State& _s = s)
+    const auto push_undo = [&](State& _s = s) // after making changes, can undo, can't redo
     {
         undo_stack.push(_s);
         // clear
         redo_stack = std::stack<State>();
     };
-    const auto undo = [&]()
+    const auto undo = [&]() // after undoing, we can redo
     {
         if (!undo_stack.empty())
         {
@@ -40,7 +59,7 @@ int main(int argc, char* argv[])
             undo_stack.pop();
         }
     };
-    const auto redo = [&]()
+    const auto redo = [&]() // after redoing, we can undo
     {
         if (!redo_stack.empty())
         {
@@ -50,10 +69,10 @@ int main(int argc, char* argv[])
         }
     };
 
-    Eigen::MatrixXd V, U;
+    Eigen::MatrixXd V, U; // rest and transformed vertices
     Eigen::MatrixXi F;
-    long sel = -1;
-    Eigen::RowVector3f last_mouse;
+    long sel = -1; //?
+    Eigen::RowVector3f last_mouse; //?
     igl::min_quad_with_fixed_data<double> biharmonic_data, arap_data;
     Eigen::SparseMatrix<double> arap_K;
 
@@ -121,7 +140,7 @@ int main(int argc, char* argv[])
         3, 7, 11,
         7, 10, 11
         ).finished();
-    
+
     U = V;
     igl::opengl::glfw::Viewer viewer;
     std::cout << R"(
@@ -150,44 +169,43 @@ R,r      Reset control points
         const Eigen::RowVector3d green(0.2, 0.6, 0.3);
         if (s.placing_handles)
         {
-            viewer.data().set_vertices(V);
-            viewer.data().set_colors(blue);
-            viewer.data().set_points(s.CV, orange);
+            viewer.data().set_vertices(V); // all triangle vertices
+            viewer.data().set_colors(blue); // face color
+            viewer.data().set_points(s.CV, orange); // control points
         }
         else
         {
             // SOLVE FOR DEFORMATION
             switch (method)
             {
-            default:
-            case BIHARMONIC:
-            {
-                Eigen::MatrixXd D;
-                //biharmonic_solve(biharmonic_data, s.CU - s.CV, D);
-                U = V + D;
-                break;
-            }
-            case ARAP:
-            {
-                //arap_single_iteration(arap_data, arap_K, s.CU, U);
-                break;
-            }
+                default:
+                    case BIHARMONIC:
+                    {
+                        Eigen::MatrixXd D;
+                        //biharmonic_solve(biharmonic_data, s.CU - s.CV, D);
+                        U = V + D;
+                        break;
+                    }
+                    case ARAP:
+                    {
+                        //arap_single_iteration(arap_data, arap_K, s.CU, U);
+                        break;
+                    }
             }
             viewer.data().set_vertices(U);
-            viewer.data().set_colors(method == BIHARMONIC ? orange : yellow);
-            viewer.data().set_points(s.CU, method == BIHARMONIC ? blue : green);
+            viewer.data().set_colors(method == ARAP ? orange : yellow);
+            viewer.data().set_points(s.CU, method == ARAP ? blue : green);
         }
         viewer.data().compute_normals();
     };
-    viewer.callback_mouse_down =
-        [&](igl::opengl::glfw::Viewer&, int, int)->bool
+    viewer.callback_mouse_down = [&](igl::opengl::glfw::Viewer&, int, int)->bool
     {
         last_mouse = Eigen::RowVector3f(
             viewer.current_mouse_x, viewer.core().viewport(3) - viewer.current_mouse_y, 0);
         if (s.placing_handles)
         {
             // Find closest point on mesh to mouse position
-            int fid;
+            int fid; // face index in V
             Eigen::Vector3f bary;
             if (igl::unproject_onto_mesh(
                 last_mouse.head(2),
@@ -197,9 +215,10 @@ R,r      Reset control points
                 V, F,
                 fid, bary))
             {
-                long c;
+                long c; //? long type // vertex index in face (0, 1, 2)
                 bary.maxCoeff(&c);
-                Eigen::RowVector3d new_c = V.row(F(fid, c));
+                Eigen::RowVector3d new_c = V.row(F(fid, c)); // x,y,z coords of vertex
+                std::cout << "hello: " << new_c[0] << new_c[1] << new_c[2] << std::endl;
                 if (s.CV.size() == 0 || (s.CV.rowwise() - new_c).rowwise().norm().minCoeff() > 0)
                 {
                     push_undo();
@@ -300,7 +319,7 @@ R,r      Reset control points
                 igl::snap_points(s.CV, V, b);
                 // PRECOMPUTATION FOR DEFORMATION
                 //biharmonic_precompute(V, F, b, biharmonic_data);
-                //arap_precompute(V, F, b, arap_data, arap_K);
+                igl::arap_precomputation(V, F, V.cols(), b, arap_data);
             }
             break;
         default:
