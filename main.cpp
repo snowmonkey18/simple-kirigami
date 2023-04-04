@@ -319,7 +319,7 @@ R,r      Reset control points
                 igl::snap_points(s.CV, V, b);
                 // PRECOMPUTATION FOR DEFORMATION
                 //biharmonic_precompute(V, F, b, biharmonic_data);
-                igl::arap_precomputation(V, F, V.cols(), b, arap_data);
+                //igl::arap_precomputation(V, F, V.cols(), b, arap_data);
             }
             break;
         default:
