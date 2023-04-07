@@ -14,16 +14,16 @@ struct State
 
 int main(int argc, char* argv[]) //? necessary?
 {
-    Eigen::MatrixXd V, U; // rest and transformed vertices
-    Eigen::MatrixXi F;
+    Eigen::MatrixXd V(12, 3), U(12, 3); // rest and transformed vertices
+    Eigen::MatrixXi F(8,3);
+    Eigen::VectorXi S(36);
     long sel = -1;
     Eigen::RowVector3f last_mouse;
     igl::min_quad_with_fixed_data<double> arap_data; // <igl/min_quad_with_fixed.h>
     Eigen::SparseMatrix<double> arap_K;
 
     // Load input meshes
-    V = (Eigen::MatrixXd(12, 3) <<
-        0.f, 0.f, 0.f,
+    V << 0.f, 0.f, 0.f,
         1.f, 0.f, 0.f,
         1.f, 1.f, 0.f, //p1
         0.f, 1.f, 0.f, //p3
@@ -41,19 +41,18 @@ int main(int argc, char* argv[]) //? necessary?
         //p3
         //p4
         1.f, 2.f, 0.f,
-        0.f, 2.f, 0.f
-        ).finished();
-    F = (Eigen::MatrixXi(8, 3) <<
-        0, 1, 3,
+        0.f, 2.f, 0.f;
+    F << 0, 1, 3,
         1, 2, 3,
         4, 5, 2,
         5, 6, 2,
         7, 6, 9,
         6, 8, 9,
         3, 7, 11,
-        7, 10, 11
-        ).finished();
+        7, 10, 11;
     U = V;
+    S.setConstant(-1);
+
     igl::opengl::glfw::Viewer viewer; // #include <igl/opengl/glfw/Viewer.h>
     std::cout << R"(
 [click]  To place new control point
@@ -78,7 +77,7 @@ R,r      Reset control points
         {
             // SOLVE FOR ARAP DEFORMATION
             //arap_single_iteration(arap_data, arap_K, s.CU, U);
-            
+
 
             viewer.data().set_vertices(U); // transformed mesh vertices
             viewer.data().set_colors(orange); // face color
@@ -180,32 +179,32 @@ R,r      Reset control points
     {
         switch (key)
         {
-            case 'R':
-            case 'r':
+        case 'R':
+        case 'r':
+        {
+            s.CU = s.CV;
+            break;
+        }
+        case 'U':
+        case 'u':
+        {
+            // Just trigger an update
+            break;
+        }
+        case ' ':
+            s.placing_handles ^= 1;
+            if (!s.placing_handles && s.CV.rows() > 0)
             {
+                // Switching to deformation mode
                 s.CU = s.CV;
-                break;
+                Eigen::VectorXi b;
+                igl::snap_points(s.CV, V, b);
+                // PRECOMPUTATION FOR DEFORMATION
+                //igl::arap_precomputation(V, F, V.cols(), b, arap_data);
             }
-            case 'U':
-            case 'u':
-            {
-                // Just trigger an update
-                break;
-            }
-            case ' ':
-                s.placing_handles ^= 1;
-                if (!s.placing_handles && s.CV.rows() > 0)
-                {
-                    // Switching to deformation mode
-                    s.CU = s.CV;
-                    Eigen::VectorXi b;
-                    igl::snap_points(s.CV, V, b);
-                    // PRECOMPUTATION FOR DEFORMATION
-                    //igl::arap_precomputation(V, F, V.cols(), b, arap_data);
-                }
-                break;
-            default:
-                return false;
+            break;
+        default:
+            return false;
         }
         update();
         return true;
