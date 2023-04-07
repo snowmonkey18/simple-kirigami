@@ -1,50 +1,48 @@
-﻿//#include "biharmonic_precompute.h"
-//#include "biharmonic_solve.h"
-//#include "arap_precompute.h"
-//#include "arap_single_iteration.h"
-#include <igl/min_quad_with_fixed.h>
-#include <igl/read_triangle_mesh.h>
-#include <igl/opengl/glfw/Viewer.h>
-#include <igl/project.h>
-#include <igl/unproject.h>
-#include <igl/snap_points.h>
-#include <igl/unproject_onto_mesh.h>
-#include <Eigen/Core>
-#include <iostream>
-#include <stack>
+﻿//#include <igl/read_triangle_mesh.h>
+//#include <igl/project.h>
+//#include <igl/unproject.h>
+//#include <Eigen/Core>
+//#include <iostream>
+//
+//#include <igl/colon.h>
+//#include <igl/directed_edge_orientations.h>
+//#include <igl/directed_edge_parents.h>
+//#include <igl/forward_kinematics.h>
+//#include <igl/PI.h>
+//#include <igl/lbs_matrix.h>
+//#include <igl/deform_skeleton.h>
+//#include <igl/dqs.h>
+//#include <igl/readDMAT.h>
+//#include <igl/readOFF.h>
+//#include <igl/arap.h>
+//#include <igl/opengl/glfw/Viewer.h>
+//
+//#include <Eigen/Geometry>
+//#include <vector>
+//#include <algorithm>
+//#include <iostream>
 
-#include <igl/colon.h>
-#include <igl/directed_edge_orientations.h>
-#include <igl/directed_edge_parents.h>
-#include <igl/forward_kinematics.h>
-#include <igl/PI.h>
-#include <igl/lbs_matrix.h>
-#include <igl/deform_skeleton.h>
-#include <igl/dqs.h>
-#include <igl/readDMAT.h>
-#include <igl/readOFF.h>
-#include <igl/arap.h>
-#include <igl/opengl/glfw/Viewer.h>
-
-#include <Eigen/Geometry>
 #include <Eigen/StdVector>
-#include <vector>
-#include <algorithm>
-#include <iostream>
+#include <stack>
+#include <igl/min_quad_with_fixed.h>
+#include <igl/opengl/glfw/Viewer.h>
+#include <igl/unproject_onto_mesh.h>
+#include <igl/snap_points.h>
 
 // Undoable
 struct State
 {
     // Rest and transformed control points
-    Eigen::MatrixXd CV, CU;
+    Eigen::MatrixXd CV, CU; // <Eigen/StdVector>
     bool placing_handles = true;
 } s;
 
-int main(int argc, char* argv[])
+int main(int argc, char* argv[]) //? necessary?
 {
     // Undo Management
-    std::stack<State> undo_stack, redo_stack;
-    const auto push_undo = [&](State& _s = s) // after making changes, can undo, can't redo
+    std::stack<State> undo_stack, redo_stack; // <stack>
+    // after making changes, can undo, can't redo
+    const auto push_undo = [&](State& _s = s) // pass in _s by reference, with default value s
     {
         undo_stack.push(_s);
         // clear
@@ -73,63 +71,31 @@ int main(int argc, char* argv[])
     Eigen::MatrixXi F;
     long sel = -1; //?
     Eigen::RowVector3f last_mouse; //?
-    igl::min_quad_with_fixed_data<double> biharmonic_data, arap_data;
+    igl::min_quad_with_fixed_data<double> arap_data; // <igl/min_quad_with_fixed.h>
     Eigen::SparseMatrix<double> arap_K;
 
     // Load input meshes
-    float z = 0.f;
-
-    float x00 = 0.f;
-    float y00 = 0.f;
-    float x01 = x00 + 1.f;
-    float y01 = y00;
-    float x02 = x01;
-    float y02 = y01 + 1.f;
-    float x03 = x02 - 1.f;
-    float y03 = y02;
-
-    float x10 = x02;
-    float y10 = y02 - 1.f;
-    float x11 = x10 + 1.f;
-    float y11 = y10;
-    float x12 = x11;
-    float y12 = y11 + 1.f;
-
-    float x20 = x12 - 1.f;
-    float y20 = y12 + 0.f;
-    float x22 = x12 + 0.f;
-    float y22 = y12 + 1.f;
-    float x23 = x22 - 1.f;
-    float y23 = y22 + 0.f;
-
-    float x32 = x20;
-    float y32 = y20 + 1.f;
-    float x33 = x32 - 1.f;
-    float y33 = y32;
-
     V = (Eigen::MatrixXd(12, 3) <<
-        x00, y00, z,
-        x01, y01, z,
-        x02, y02, z,
-        x03, y03, z,
+        0.f, 0.f, 0.f,
+        1.f, 0.f, 0.f,
+        1.f, 1.f, 0.f, //p1
+        0.f, 1.f, 0.f, //p3
 
-        x10, y10, z,
-        x11, y11, z,
-        x12, y12, z,
-        //xy13 = xy02
+        1.f, 0.f, 0.f,
+        2.f, 0.f, 0.f,
+        2.f, 1.f, 0.f, //p2
+        //p1
 
-        x20, y20, z,
-        //xy21 = xy12
-        x22, y22, z,
-        x23, y23, z,
+        1.f, 1.f, 0.f, //p4
+        //p2
+        2.f, 2.f, 0.f,
+        1.f, 2.f, 0.f,
 
-        //xy30 = xy13
-        //xy31 = xy20
-        x32, y32, z,
-        x33, y33, z
+        //p3
+        //p4
+        1.f, 2.f, 0.f,
+        0.f, 2.f, 0.f
         ).finished();
-
-
     F = (Eigen::MatrixXi(8, 3) <<
         0, 1, 3,
         1, 2, 3,
@@ -140,61 +106,37 @@ int main(int argc, char* argv[])
         3, 7, 11,
         7, 10, 11
         ).finished();
-
     U = V;
-    igl::opengl::glfw::Viewer viewer;
+    igl::opengl::glfw::Viewer viewer; // #include <igl/opengl/glfw/Viewer.h>
     std::cout << R"(
 [click]  To place new control point
 [drag]   To move control point
 [space]  Toggle whether placing control points or deforming
-M,m      Switch deformation methods
 U,u      Update deformation (i.e., run another iteration of solver)
-R,r      Reset control points 
+R,r      Reset control points
 ⌘ Z      Undo
 ⌘ ⇧ Z    Redo
 )";
-    enum Method
-    {
-        BIHARMONIC = 0,
-        ARAP = 1,
-        NUM_METHODS = 2,
-    } method = ARAP;
 
     const auto& update = [&]()
     {
         // predefined colors
         const Eigen::RowVector3d orange(1.0, 0.7, 0.2);
-        const Eigen::RowVector3d yellow(1.0, 0.9, 0.2);
         const Eigen::RowVector3d blue(0.2, 0.3, 0.8);
-        const Eigen::RowVector3d green(0.2, 0.6, 0.3);
         if (s.placing_handles)
         {
-            viewer.data().set_vertices(V); // all triangle vertices
+            viewer.data().set_vertices(V); // rest mesh vertices
             viewer.data().set_colors(blue); // face color
-            viewer.data().set_points(s.CV, orange); // control points
+            viewer.data().set_points(s.CV, orange); // rest control points
         }
         else
         {
-            // SOLVE FOR DEFORMATION
-            switch (method)
-            {
-                default:
-                    case BIHARMONIC:
-                    {
-                        Eigen::MatrixXd D;
-                        //biharmonic_solve(biharmonic_data, s.CU - s.CV, D);
-                        U = V + D;
-                        break;
-                    }
-                    case ARAP:
-                    {
-                        //arap_single_iteration(arap_data, arap_K, s.CU, U);
-                        break;
-                    }
-            }
-            viewer.data().set_vertices(U);
-            viewer.data().set_colors(method == ARAP ? orange : yellow);
-            viewer.data().set_points(s.CU, method == ARAP ? blue : green);
+            // SOLVE FOR ARAP DEFORMATION
+            //arap_single_iteration(arap_data, arap_K, s.CU, U);
+
+            viewer.data().set_vertices(U); // transformed mesh vertices
+            viewer.data().set_colors(orange); // face color
+            viewer.data().set_points(s.CU, blue); // transformed control points
         }
         viewer.data().compute_normals();
     };
@@ -202,12 +144,13 @@ R,r      Reset control points
     {
         last_mouse = Eigen::RowVector3f(
             viewer.current_mouse_x, viewer.core().viewport(3) - viewer.current_mouse_y, 0);
+        std::cout << "last_mouse: " << last_mouse[0] << ' ' << last_mouse[1] << ' ' << last_mouse[2] << std::endl;
         if (s.placing_handles)
         {
             // Find closest point on mesh to mouse position
             int fid; // face index in V
-            Eigen::Vector3f bary;
-            if (igl::unproject_onto_mesh(
+            Eigen::Vector3f bary; // wrt fid face of V
+            if (igl::unproject_onto_mesh( // <igl/unproject_onto_mesh.h>
                 last_mouse.head(2),
                 viewer.core().view,
                 viewer.core().proj,
@@ -215,10 +158,12 @@ R,r      Reset control points
                 V, F,
                 fid, bary))
             {
-                long c; //? long type // vertex index in face (0, 1, 2)
+                std::cout << "bary: " << bary[0] << ' ' << bary[1] << ' ' << bary[2] << std::endl;
+                long c; // vertex index in face (0, 1, 2)
                 bary.maxCoeff(&c);
+                std::cout << "c: " << c << std::endl;
                 Eigen::RowVector3d new_c = V.row(F(fid, c)); // x,y,z coords of vertex
-                std::cout << "hello: " << new_c[0] << new_c[1] << new_c[2] << std::endl;
+                std::cout << "new_c: " << new_c[0] << ' ' << new_c[1] << ' ' << new_c[2] << std::endl;
                 if (s.CV.size() == 0 || (s.CV.rowwise() - new_c).rowwise().norm().minCoeff() > 0)
                 {
                     push_undo();
@@ -289,41 +234,34 @@ R,r      Reset control points
     {
         switch (key)
         {
-        case 'M':
-        case 'm':
-        {
-            method = (Method)(((int)(method)+1) % ((int)(NUM_METHODS)));
-            break;
-        }
-        case 'R':
-        case 'r':
-        {
-            push_undo();
-            s.CU = s.CV;
-            break;
-        }
-        case 'U':
-        case 'u':
-        {
-            // Just trigger an update
-            break;
-        }
-        case ' ':
-            push_undo();
-            s.placing_handles ^= 1;
-            if (!s.placing_handles && s.CV.rows() > 0)
+            case 'R':
+            case 'r':
             {
-                // Switching to deformation mode
+                push_undo();
                 s.CU = s.CV;
-                Eigen::VectorXi b;
-                igl::snap_points(s.CV, V, b);
-                // PRECOMPUTATION FOR DEFORMATION
-                //biharmonic_precompute(V, F, b, biharmonic_data);
-                //igl::arap_precomputation(V, F, V.cols(), b, arap_data);
+                break;
             }
-            break;
-        default:
-            return false;
+            case 'U':
+            case 'u':
+            {
+                // Just trigger an update
+                break;
+            }
+            case ' ':
+                push_undo();
+                s.placing_handles ^= 1;
+                if (!s.placing_handles && s.CV.rows() > 0)
+                {
+                    // Switching to deformation mode
+                    s.CU = s.CV;
+                    Eigen::VectorXi b;
+                    igl::snap_points(s.CV, V, b);
+                    // PRECOMPUTATION FOR DEFORMATION
+                    //igl::arap_precomputation(V, F, V.cols(), b, arap_data);
+                }
+                break;
+            default:
+                return false;
         }
         update();
         return true;
@@ -344,7 +282,7 @@ R,r      Reset control points
     viewer.callback_pre_draw =
         [&](igl::opengl::glfw::Viewer&)->bool
     {
-        if (viewer.core().is_animating && !s.placing_handles && method == ARAP)
+        if (viewer.core().is_animating && !s.placing_handles)
         {
             //arap_single_iteration(arap_data, arap_K, s.CU, U);
             update();
