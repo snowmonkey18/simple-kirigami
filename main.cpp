@@ -1,29 +1,4 @@
-﻿//#include <igl/read_triangle_mesh.h>
-//#include <igl/project.h>
-//#include <igl/unproject.h>
-//#include <Eigen/Core>
-//#include <iostream>
-//
-//#include <igl/colon.h>
-//#include <igl/directed_edge_orientations.h>
-//#include <igl/directed_edge_parents.h>
-//#include <igl/forward_kinematics.h>
-//#include <igl/PI.h>
-//#include <igl/lbs_matrix.h>
-//#include <igl/deform_skeleton.h>
-//#include <igl/dqs.h>
-//#include <igl/readDMAT.h>
-//#include <igl/readOFF.h>
-//#include <igl/arap.h>
-//#include <igl/opengl/glfw/Viewer.h>
-//
-//#include <Eigen/Geometry>
-//#include <vector>
-//#include <algorithm>
-//#include <iostream>
-
-#include <Eigen/StdVector>
-#include <stack>
+﻿#include <Eigen/StdVector>
 #include <igl/min_quad_with_fixed.h>
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/unproject_onto_mesh.h>
@@ -39,38 +14,10 @@ struct State
 
 int main(int argc, char* argv[]) //? necessary?
 {
-    // Undo Management
-    std::stack<State> undo_stack, redo_stack; // <stack>
-    // after making changes, can undo, can't redo
-    const auto push_undo = [&](State& _s = s) // pass in _s by reference, with default value s
-    {
-        undo_stack.push(_s);
-        // clear
-        redo_stack = std::stack<State>();
-    };
-    const auto undo = [&]() // after undoing, we can redo
-    {
-        if (!undo_stack.empty())
-        {
-            redo_stack.push(s);
-            s = undo_stack.top();
-            undo_stack.pop();
-        }
-    };
-    const auto redo = [&]() // after redoing, we can undo
-    {
-        if (!redo_stack.empty())
-        {
-            undo_stack.push(s);
-            s = redo_stack.top();
-            redo_stack.pop();
-        }
-    };
-
     Eigen::MatrixXd V, U; // rest and transformed vertices
     Eigen::MatrixXi F;
-    long sel = -1; //?
-    Eigen::RowVector3f last_mouse; //?
+    long sel = -1;
+    Eigen::RowVector3f last_mouse;
     igl::min_quad_with_fixed_data<double> arap_data; // <igl/min_quad_with_fixed.h>
     Eigen::SparseMatrix<double> arap_K;
 
@@ -114,8 +61,6 @@ int main(int argc, char* argv[]) //? necessary?
 [space]  Toggle whether placing control points or deforming
 U,u      Update deformation (i.e., run another iteration of solver)
 R,r      Reset control points
-⌘ Z      Undo
-⌘ ⇧ Z    Redo
 )";
 
     const auto& update = [&]()
@@ -133,6 +78,7 @@ R,r      Reset control points
         {
             // SOLVE FOR ARAP DEFORMATION
             //arap_single_iteration(arap_data, arap_K, s.CU, U);
+            
 
             viewer.data().set_vertices(U); // transformed mesh vertices
             viewer.data().set_colors(orange); // face color
@@ -166,7 +112,6 @@ R,r      Reset control points
                 std::cout << "new_c: " << new_c[0] << ' ' << new_c[1] << ' ' << new_c[2] << std::endl;
                 if (s.CV.size() == 0 || (s.CV.rowwise() - new_c).rowwise().norm().minCoeff() > 0)
                 {
-                    push_undo();
                     s.CV.conservativeResize(s.CV.rows() + 1, 3);
                     // Snap to closest vertex on hit face
                     s.CV.row(s.CV.rows() - 1) = new_c;
@@ -185,10 +130,11 @@ R,r      Reset control points
                 viewer.core().proj, viewer.core().viewport, CP);
             Eigen::VectorXf D = (CP.rowwise() - last_mouse).rowwise().norm();
             sel = (D.minCoeff(&sel) < 30) ? sel : -1;
+            std::cout << "sel: " << sel << std::endl;
             if (sel != -1)
             {
                 last_mouse(2) = CP(sel, 2);
-                push_undo();
+                std::cout << "last_mouse: " << last_mouse[0] << ' ' << last_mouse[1] << ' ' << last_mouse[2] << std::endl;
                 update();
                 return true;
             }
@@ -237,7 +183,6 @@ R,r      Reset control points
             case 'R':
             case 'r':
             {
-                push_undo();
                 s.CU = s.CV;
                 break;
             }
@@ -248,7 +193,6 @@ R,r      Reset control points
                 break;
             }
             case ' ':
-                push_undo();
                 s.placing_handles ^= 1;
                 if (!s.placing_handles && s.CV.rows() > 0)
                 {
@@ -265,19 +209,6 @@ R,r      Reset control points
         }
         update();
         return true;
-    };
-
-    // Special callback for handling undo
-    viewer.callback_key_down =
-        [&](igl::opengl::glfw::Viewer&, unsigned char key, int mod)->bool
-    {
-        if (key == 'Z' && (mod & GLFW_MOD_SUPER))
-        {
-            (mod & GLFW_MOD_SHIFT) ? redo() : undo();
-            update();
-            return true;
-        }
-        return false;
     };
     viewer.callback_pre_draw =
         [&](igl::opengl::glfw::Viewer&)->bool
