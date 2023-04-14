@@ -6,12 +6,11 @@
 #include <igl/colon.h>
 #include <algorithm>
 
-Eigen::MatrixXd CV, CU; // Rest and transformed control points
+Eigen::MatrixXd CV, CU; // rest and transformed control points
 Eigen::MatrixXd V(12, 3), U(12, 3); // rest and transformed vertices
 Eigen::MatrixXi F(8, 3);
 Eigen::VectorXi S(12), b;
 bool placing_handles = true;
-int count = 0;
 long sel = -1;
 Eigen::RowVector3f last_mouse;
 igl::ARAPData arap_data;
@@ -77,11 +76,6 @@ int main(int argc, char* argv[]) //? necessary?
         else
         {
             // SOLVE FOR ARAP DEFORMATION
-            //Eigen::MatrixXd bc(b.size(), V.cols());
-            //for (int i = 0;i < b.size();i++)
-            //{
-            //    bc.row(i) = V.row(b(i));
-            //}
             igl::arap_solve(CU, arap_data, U);
             viewer.data().set_vertices(U); // transformed mesh vertices
             viewer.data().set_colors(orange); // face color
@@ -93,27 +87,23 @@ int main(int argc, char* argv[]) //? necessary?
     {
         last_mouse = Eigen::RowVector3f(
             viewer.current_mouse_x, viewer.core().viewport(3) - viewer.current_mouse_y, 0);
-        std::cout << "last_mouse: " << last_mouse[0] << ' ' << last_mouse[1] << ' ' << last_mouse[2] << std::endl;
         if (placing_handles)
         {
             // Find closest point on mesh to mouse position
             int fid; // face index in V
             Eigen::Vector3f bary; // wrt fid face of V
-            if (igl::unproject_onto_mesh( // <igl/unproject_onto_mesh.h>
+            if (igl::unproject_onto_mesh(
                 last_mouse.head(2),
                 viewer.core().view,
                 viewer.core().proj,
                 viewer.core().viewport,
                 V, F, fid, bary))
             {
-                std::cout << "bary: " << bary[0] << ' ' << bary[1] << ' ' << bary[2] << std::endl;
                 long c; // vertex index in face (0, 1, 2)
                 bary.maxCoeff(&c);
-                std::cout << "c: " << c << std::endl;
                 int vid = F(fid, c);
-                S(vid) = count++;
+                S(vid) = 1;
                 Eigen::RowVector3d new_c = V.row(vid); // x,y,z coords of vertex
-                std::cout << "new_c: " << new_c[0] << ' ' << new_c[1] << ' ' << new_c[2] << std::endl;
                 if (CV.size() == 0 || (CV.rowwise() - new_c).rowwise().norm().minCoeff() > 0)
                 {
                     CV.conservativeResize(CV.rows() + 1, 3);
@@ -134,11 +124,9 @@ int main(int argc, char* argv[]) //? necessary?
                 viewer.core().proj, viewer.core().viewport, CP);
             Eigen::VectorXf D = (CP.rowwise() - last_mouse).rowwise().norm();
             sel = (D.minCoeff(&sel) < 30) ? sel : -1;
-            std::cout << "sel: " << sel << std::endl;
             if (sel != -1)
             {
                 last_mouse(2) = CP(sel, 2);
-                std::cout << "last_mouse: " << last_mouse[0] << ' ' << last_mouse[1] << ' ' << last_mouse[2] << std::endl;
                 update();
                 return true;
             }
@@ -204,11 +192,6 @@ int main(int argc, char* argv[]) //? necessary?
     {
         if (viewer.core().is_animating && !placing_handles)
         {
-            //Eigen::MatrixXd bc(b.size(), V.cols());
-            //for (int i = 0;i < b.size();i++)
-            //{
-            //    bc.row(i) = V.row(b(i));
-            //}
             igl::arap_solve(CU, arap_data, U);
             viewer.data().set_vertices(U);
             viewer.data().compute_normals();
