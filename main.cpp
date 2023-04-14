@@ -15,7 +15,7 @@ long sel = -1;
 Eigen::RowVector3f last_mouse;
 igl::ARAPData arap_data;
 
-int main(int argc, char* argv[]) //? necessary?
+int main(int argc, char* argv[])
 {
     // Load input meshes
     V << 0.f, 0.f, 0.f,
@@ -53,9 +53,10 @@ int main(int argc, char* argv[]) //? necessary?
         [](int i)->bool {return S(i) >= 0;}) - b.data());
     // Precomputation
     arap_data.max_iter = 100;
+    arap_data.energy = igl::ARAP_ENERGY_TYPE_ELEMENTS;;
     igl::arap_precomputation(V, F, V.cols(), b, arap_data);
 
-    igl::opengl::glfw::Viewer viewer; // #include <igl/opengl/glfw/Viewer.h>
+    igl::opengl::glfw::Viewer viewer;
     std::cout << R"(
         [click]  To place new control point
         [drag]   To move control point
